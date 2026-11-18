@@ -1,6 +1,6 @@
 // Address of the Cloudflare Worker that stores sign-ups.
 // Same address as the pages when served from Cloudflare; set the full Worker address for GitHub Pages.
-window.FDP_API = location.hostname.endsWith("github.io") ? "https://edge-fdp-signup.REPLACE.workers.dev" : "";
+window.FDP_API = location.hostname.endsWith("github.io") ? "https://edge-fdp-signup.edgefdp.workers.dev" : "";
 
 // Lagos time (WAT, UTC+1, no daylight saving), shown to hundredths of a second.
 window.lagosTime = function (ms, withDate) {
