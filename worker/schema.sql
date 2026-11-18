@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS signups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  name_key TEXT NOT NULL UNIQUE,
+  chapter INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS signups_chapter ON signups(chapter);

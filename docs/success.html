@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>You're Signed Up · Edge FDP</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="eyebrow">Edge Field Development Plan</div>
+    <h1 id="hello">You're signed up</h1>
+  </header>
+  <div class="card">
+    <div class="tag">Your chapter</div>
+    <div class="big" id="chapter"></div>
+    <p class="lede" style="margin:0">Your spot is saved. To switch chapters, go back to the sign-up page with the same name.</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="everyone.html">See who picked what</a>
+    <a class="btn ghost" href="index.html">Change my chapter</a>
+  </div>
+</main>
+<script>
+const p = new URLSearchParams(location.search);
+const ch = Number(p.get("ch"));
+document.getElementById("chapter").textContent = p.get("t") ? `${ch + 1}. ${p.get("t")}` : "Saved";
+if (p.get("n")) document.getElementById("hello").textContent = `You're signed up, ${p.get("n").split(" ")[0]}`;
+</script>
+</body>
+</html>

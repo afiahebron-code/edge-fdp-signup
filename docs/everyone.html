@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Who Picked What · Edge FDP</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="eyebrow">Edge Field Development Plan</div>
+    <h1>Who picked what</h1>
+    <p class="lede" id="sum">Loading…</p>
+  </header>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Chapter</th><th>People</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div class="actions"><a class="btn ghost" href="index.html">Back to sign-up</a></div>
+</main>
+<script src="config.js"></script>
+<script>
+async function load() {
+  try {
+    const d = await (await fetch(FDP_API + "/api/roster", { cache: "no-store" })).json();
+    const rows = document.getElementById("rows"); rows.textContent = "";
+    d.chapters.forEach((title, i) => {
+      const people = d.signups.filter(s => s.chapter === i).map(s => s.name);
+      const tr = document.createElement("tr");
+      const a = document.createElement("td"); a.className = "title";
+      const n = document.createElement("span"); n.className = "num"; n.textContent = (i + 1) + ".";
+      a.append(n, document.createTextNode(title));
+      const b = document.createElement("td");
+      b.className = people.length ? "names" : "empty";
+      b.textContent = people.length ? people.join(", ") : "No one yet";
+      if (people.length >= d.cap) { const tg = document.createElement("div"); tg.className = "tag"; tg.textContent = "Full"; b.append(tg); }
+      tr.append(a, b); rows.append(tr);
+    });
+    document.getElementById("sum").textContent = `${d.signups.length} people signed up. ${d.chapters.length * d.cap - d.signups.length} seats left.`;
+  } catch (e) { document.getElementById("sum").textContent = "Couldn't load the list. Refresh to try again."; }
+}
+load(); setInterval(load, 20000);
+</script>
+</body>
+</html>

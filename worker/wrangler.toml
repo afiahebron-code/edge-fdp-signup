@@ -1,0 +1,8 @@
+name = "edge-fdp-signup"
+main = "index.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "edge-fdp-signup"
+database_id = "REPLACE"

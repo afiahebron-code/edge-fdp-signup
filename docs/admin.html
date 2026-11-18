@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Admin · Edge FDP Sign-up</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="eyebrow">Edge FDP sign-up</div>
+    <h1>Admin</h1>
+    <p class="lede">Remove one person or clear every sign-up. Use this after testing, before you send the link to the class.</p>
+  </header>
+
+  <form id="login" class="card">
+    <label class="field" for="key">Admin password
+      <input type="password" id="key" autocomplete="current-password">
+    </label>
+    <div class="actions"><button class="btn" type="submit">Unlock</button></div>
+  </form>
+
+  <div id="status" class="status" hidden></div>
+
+  <section id="panel" hidden style="display:flex;flex-direction:column;gap:16px">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Chapter</th><th>People</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>Reset everything</h2>
+      <p class="lede" style="margin:0">Deletes every sign-up. This can't be undone.</p>
+      <div class="actions">
+        <button id="reset" class="btn danger" type="button">Delete all sign-ups</button>
+        <button id="confirm" class="btn danger" type="button" hidden>Yes, delete all</button>
+        <button id="cancel" class="btn ghost" type="button" hidden>Cancel</button>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="config.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let key = "";
+try { key = sessionStorage.getItem("fdp-admin") || ""; } catch (e) {}
+function say(m, err) { $("status").hidden = !m; $("status").textContent = m || ""; $("status").classList.toggle("err", !!err); }
+const post = (path, body) => fetch(FDP_API + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, ...body }) }).then(r => r.json());
+
+async function unlock() {
+  const out = await post("/api/admin/check", {});
+  if (!out.ok) { say(out.error || "Wrong admin password.", true); return; }
+  try { sessionStorage.setItem("fdp-admin", key); } catch (e) {}
+  $("login").hidden = true; $("panel").hidden = false; say(""); load();
+}
+$("login").addEventListener("submit", e => { e.preventDefault(); key = $("key").value; unlock(); });
+
+async function load() {
+  const d = await (await fetch(FDP_API + "/api/roster", { cache: "no-store" })).json();
+  const rows = $("rows"); rows.textContent = "";
+  d.chapters.forEach((title, i) => {
+    const tr = document.createElement("tr");
+    const a = document.createElement("td"); a.textContent = `${i + 1}. ${title}`;
+    const b = document.createElement("td");
+    const people = d.signups.filter(s => s.chapter === i);
+    if (!people.length) { b.className = "empty"; b.textContent = "No one yet"; }
+    people.forEach(p => {
+      const line = document.createElement("div"); line.textContent = p.name;
+      const x = document.createElement("button"); x.className = "link"; x.type = "button"; x.textContent = "remove";
+      x.addEventListener("click", async () => { await post("/api/admin/remove", { id: p.id }); say(`Removed ${p.name}.`); load(); });
+      line.append(x); b.append(line);
+    });
+    tr.append(a, b); rows.append(tr);
+  });
+}
+
+$("reset").addEventListener("click", () => { $("reset").hidden = true; $("confirm").hidden = false; $("cancel").hidden = false; });
+$("cancel").addEventListener("click", () => { $("reset").hidden = false; $("confirm").hidden = true; $("cancel").hidden = true; });
+$("confirm").addEventListener("click", async () => {
+  const out = await post("/api/admin/reset", {});
+  $("cancel").click();
+  if (out.ok) { say("All sign-ups deleted. The sheet is empty again."); load(); } else say(out.error || "Couldn't reset.", true);
+});
+
+if (key) unlock();
+</script>
+</body>
+</html>
