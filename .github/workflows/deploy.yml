@@ -50,3 +50,10 @@ jobs:
       - name: Set admin password
         working-directory: worker
         run: echo "$ADMIN_KEY" | wrangler secret put ADMIN_KEY
+      - name: Check the live site
+        run: |
+          U=https://edge-fdp-signup.edgefdp.workers.dev
+          sleep 5
+          curl -sf -o /dev/null -w "pages: %{http_code}\n" $U/
+          curl -sf $U/api/chapters | jq -c '{cap, opensAt, chapters: (.chapters|length)}'
+          curl -sf "$U/api/chapters?mode=test" | jq -c '{test, chapters: (.chapters|length)}'

@@ -33,6 +33,12 @@ async function getOpensAt(db, isTest) {
   return row ? Number(row.value) : 0;
 }
 
+// Changes every time the admin resets a list, so devices that signed up in a rehearsal are released.
+async function getRound(db, isTest) {
+  const row = await db.prepare("SELECT value FROM settings WHERE key = ?1").bind(isTest ? "test_round" : "round").first();
+  return row ? row.value : "0";
+}
+
 async function counts(db, T) {
   const { results } = await db.prepare(`SELECT chapter, COUNT(*) AS n FROM ${T} GROUP BY chapter`).all();
   const c = Array(CHAPTERS.length).fill(0);
@@ -63,6 +69,7 @@ export default {
           cap: CAP,
           mine,
           opensAt: await getOpensAt(db, isTest),
+          round: await getRound(db, isTest),
           test: isTest,
           now: Date.now(),
           chapters: CHAPTERS.map((title, id) => ({ id, title, taken: c[id], left: Math.max(0, CAP - c[id]) })),
@@ -87,19 +94,27 @@ export default {
         const opensAt = await getOpensAt(db, isTest);
         if (Date.now() < opensAt) return json({ error: "Sign-up hasn't opened yet. Wait for the countdown to finish.", notOpen: true, opensAt }, 403);
         const key = nameKey(name);
-        // Atomic: only writes when the chapter still has room (not counting this person).
-        const res = await db
-          .prepare(
-            `INSERT INTO ${T} (name, name_key, chapter, created_at)
-             SELECT ?1, ?2, ?3, ?4
-             WHERE (SELECT COUNT(*) FROM ${T} WHERE chapter = ?3 AND name_key <> ?2) < ?5
-             ON CONFLICT(name_key) DO UPDATE SET name = excluded.name, chapter = excluded.chapter, created_at = excluded.created_at`
-          )
-          .bind(name, key, ch, Date.now(), CAP)
-          .run();
+        const existing = await db.prepare(`SELECT chapter FROM ${T} WHERE name_key = ?1`).bind(key).first();
+        if (existing)
+          return json({ error: `${name} has already signed up for chapter ${existing.chapter + 1} (${CHAPTERS[existing.chapter]}). Ask the class rep if it needs changing.`, already: true }, 409);
+        // Atomic: only writes when the chapter still has room.
+        let res;
+        try {
+          res = await db
+            .prepare(
+              `INSERT INTO ${T} (name, name_key, chapter, created_at)
+               SELECT ?1, ?2, ?3, ?4
+               WHERE (SELECT COUNT(*) FROM ${T} WHERE chapter = ?3) < ?5`
+            )
+            .bind(name, key, ch, Date.now(), CAP)
+            .run();
+        } catch (e) {
+          if (String(e).includes("UNIQUE")) return json({ error: `${name} has already signed up.`, already: true }, 409);
+          throw e;
+        }
         if (!res.meta.changes)
           return json({ error: `"${CHAPTERS[ch]}" just filled up. Please pick another chapter.`, full: true }, 409);
-        return json({ ok: true, name, chapter: ch, title: CHAPTERS[ch], at: Date.now(), test: isTest });
+        return json({ ok: true, name, chapter: ch, title: CHAPTERS[ch], at: Date.now(), test: isTest, round: await getRound(db, isTest) });
       }
 
       // Admin: remove one person or reset everything.
@@ -117,7 +132,11 @@ export default {
           return json({ ok: true, opensAt: t });
         }
         if (url.pathname === "/api/admin/reset") {
-          await db.prepare(`DELETE FROM ${T}`).run();
+          await db.batch([
+            db.prepare(`DELETE FROM ${T}`),
+            db.prepare("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+              .bind(isTest ? "test_round" : "round", String(Date.now())),
+          ]);
           return json({ ok: true });
         }
       }

@@ -21,10 +21,13 @@
       <tbody id="rows"></tbody>
     </table>
   </div>
-  <div class="actions"><a class="btn ghost" href="index.html">Back to sign-up</a></div>
+  <div class="actions" id="backrow"><a class="btn ghost" href="index.html">Back to sign-up</a></div>
 </main>
 <script src="config.js"></script>
 <script>
+let myPick = null;
+try { myPick = JSON.parse(localStorage.getItem("fdp-done-" + (FDP_TEST ? "test" : "live")) || "null"); } catch (e) {}
+if (myPick) document.getElementById("backrow").hidden = true;
 async function load() {
   try {
     const d = await (await fetch(apiUrl("/api/roster"), { cache: "no-store" })).json();
@@ -41,6 +44,7 @@ async function load() {
       people.forEach(p => {
         const line = document.createElement("div"); line.className = "person";
         const nm = document.createElement("span"); nm.textContent = p.name;
+        if (myPick && myPick.name.toLowerCase() === p.name.toLowerCase()) { nm.textContent += " (you)"; nm.style.fontWeight = "600"; }
         const tm = document.createElement("span"); tm.className = "tag"; tm.textContent = lagosTime(p.created_at, true);
         line.append(nm, tm); b.append(line);
       });

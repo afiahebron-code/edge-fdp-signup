@@ -17,15 +17,17 @@
     <div class="tag">Your chapter</div>
     <div class="big" id="chapter"></div>
     <div class="tag" id="when"></div>
-    <p class="lede" style="margin:0">Your spot is saved. To switch chapters, go back to the sign-up page with the same name.</p>
+    <p class="lede" style="margin:0">Your spot is saved. If you need to change it, speak to the class rep.</p>
   </div>
   <div class="actions">
     <a class="btn" href="everyone.html">See who picked what</a>
-    <a class="btn ghost" href="index.html">Change my chapter</a>
   </div>
 </main>
 <script src="config.js"></script>
 <script>
+// Pressing back from here goes to the results list, not the form.
+history.pushState(null, "", location.href);
+addEventListener("popstate", () => location.replace("everyone.html" + (FDP_TEST ? "?test" : "")));
 const p = new URLSearchParams(location.search);
 const ch = Number(p.get("ch"));
 document.getElementById("chapter").textContent = p.get("t") ? `${ch + 1}. ${p.get("t")}` : "Saved";

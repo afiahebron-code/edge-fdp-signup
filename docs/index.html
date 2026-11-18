@@ -9,22 +9,29 @@
 </head>
 <body>
 <main class="wrap">
+  <section id="cover" class="cover">
+    <div class="eyebrow">Edge Field Development Plan</div>
+    <h1>FDP chapter sign-up</h1>
+    <div id="wait" hidden>
+      <div class="tag">Opens in</div>
+      <div class="countdown" id="countdown"></div>
+      <div class="tag" id="opens"></div>
+      <p class="lede">Keep this page open. It unlocks by itself when the timer reaches zero, with no need to refresh. 11 chapters, 2 people each, first come first served.</p>
+    </div>
+    <p class="lede" id="coverload">Loading…</p>
+  </section>
+
+  <section id="form" class="stack" hidden>
   <header>
     <div class="eyebrow">Edge Field Development Plan</div>
     <h1>Pick your FDP chapter</h1>
-    <p class="lede">Type your name and choose a chapter. Each chapter takes 2 people. Chapters close once they're full, so pick early if you want a particular one.</p>
+    <p class="lede">Type your name and choose a chapter. Each chapter takes 2 people. Chapters close once they're full.</p>
   </header>
 
   <label class="field" for="name">Your name
     <input type="text" id="name" autocomplete="name" placeholder="e.g. Ada Okafor" maxlength="60">
   </label>
 
-  <div id="wait" class="card" hidden>
-    <div class="tag">Sign-up opens</div>
-    <div class="big" id="opens"></div>
-    <div class="countdown" id="countdown"></div>
-    <p class="lede" style="margin:0">You can type your name now. The chapters unlock automatically when the countdown hits zero — no need to refresh.</p>
-  </div>
   <div id="status" class="status" hidden></div>
   <div id="list" class="list" role="radiogroup" aria-label="FDP chapters"><div class="row"><span></span><span class="tag">Loading chapters…</span><span></span></div></div>
 
@@ -32,13 +39,38 @@
     <button id="save" class="btn" disabled>Sign me up</button>
   </div>
   <p class="foot" id="foot"></p>
+  </section>
 </main>
 <script src="config.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const nameEl = $("name"), listEl = $("list"), statusEl = $("status"), saveEl = $("save"), footEl = $("foot");
 let data = null, picked = null, busy = false, skew = 0;
-const isOpen = () => !data || Date.now() + skew >= (data.opensAt || 0);
+const isOpen = () => !!data && Date.now() + skew >= (data.opensAt || 0);
+
+// One sign-up per device: remembered in a cookie and in local storage, released when the admin resets the list.
+const LOCK = "fdp-done-" + (FDP_TEST ? "test" : "live");
+function readLock() {
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem(LOCK) || "null"); } catch (e) {}
+  if (!v) { const m = document.cookie.match(new RegExp("(?:^|; )" + LOCK + "=([^;]*)")); if (m) try { v = JSON.parse(decodeURIComponent(m[1])); } catch (e) {} }
+  return v;
+}
+function writeLock(v) {
+  const s = JSON.stringify(v);
+  try { localStorage.setItem(LOCK, s); } catch (e) {}
+  document.cookie = LOCK + "=" + encodeURIComponent(s) + "; max-age=" + 60 * 60 * 24 * 120 + "; path=/; SameSite=Lax";
+}
+function clearLock() {
+  try { localStorage.removeItem(LOCK); } catch (e) {}
+  document.cookie = LOCK + "=; max-age=0; path=/";
+}
+function activeLock() {
+  const l = readLock();
+  if (!l || !data) return l && !data ? l : null;
+  if (String(l.round) !== String(data.round)) { clearLock(); return null; }
+  return l;
+}
 
 try { nameEl.value = localStorage.getItem("fdp-name") || ""; } catch (e) {}
 
@@ -69,9 +101,17 @@ function render() {
   updateSave();
 }
 
+function applyLock() {
+  const l = activeLock();
+  nameEl.readOnly = !!l;
+  if (l) {
+    if (nameEl.value !== l.name) { nameEl.value = l.name; }
+    say(`This device already signed up ${l.name} (chapter ${l.chapter + 1}). You can change ${l.name.split(" ")[0]}'s chapter, but you can't sign up another person from this device.`);
+  }
+}
+
 function updateSave() {
-  saveEl.disabled = busy || picked === null || !nameEl.value.trim() || !isOpen();
-  saveEl.textContent = data && data.mine !== null ? "Change my chapter" : "Sign me up";
+  saveEl.disabled = busy || picked === null || !nameEl.value.trim() || !isOpen() || (data && data.mine !== null);
 }
 
 async function load() {
@@ -80,8 +120,10 @@ async function load() {
     const res = await fetch(apiUrl("/api/chapters" + (name ? "?name=" + encodeURIComponent(name) : "")), { cache: "no-store" });
     data = await res.json();
     skew = data.now - Date.now();
-    if (picked === null && data.mine !== null) picked = data.mine;
-    if (data.mine !== null && !statusEl.textContent) say(`You already picked chapter ${data.mine + 1}. You can change it below.`);
+    // This device already submitted: always go to the results list (refresh, back button or reopening the link).
+    if (activeLock()) { location.replace("everyone.html" + (FDP_TEST ? "?test" : "")); return; }
+    if (data.mine !== null) say(`${name} has already signed up for chapter ${data.mine + 1}. If that's not you, add your surname or initial.`, true);
+    else if (statusEl.classList.contains("err") && /already signed up/.test(statusEl.textContent)) say("");
     render();
   } catch (e) {
     listEl.innerHTML = '<div class="row"><span></span><span class="tag">Couldn\'t load the chapters. Check your connection and refresh.</span><span></span></div>';
@@ -107,7 +149,8 @@ saveEl.addEventListener("click", async () => {
     const out = await res.json();
     if (out.ok) {
       try { localStorage.setItem("fdp-name", out.name); } catch (e) {}
-      location.href = "success.html?" + (FDP_TEST ? "test&" : "") + "ch=" + out.chapter + "&t=" + encodeURIComponent(out.title) + "&n=" + encodeURIComponent(out.name) + "&at=" + out.at;
+      writeLock({ name: out.name, chapter: out.chapter, round: out.round, at: out.at });
+      location.replace("success.html?" + (FDP_TEST ? "test&" : "") + "ch=" + out.chapter + "&t=" + encodeURIComponent(out.title) + "&n=" + encodeURIComponent(out.name) + "&at=" + out.at);
       return;
     }
     say(out.error || "Couldn't save. Try again.", true);
@@ -120,15 +163,17 @@ let wasOpen = null;
 function tick() {
   if (!data) return;
   const open = isOpen();
-  const w = document.getElementById("wait");
-  w.hidden = open;
+  document.getElementById("coverload").hidden = true;
+  document.getElementById("cover").hidden = open;
+  document.getElementById("form").hidden = !open;
+  document.getElementById("wait").hidden = open;
   if (!open) {
-    document.getElementById("opens").textContent = lagosShort(data.opensAt);
+    document.getElementById("opens").textContent = "Opens " + lagosShort(data.opensAt);
     let s = Math.ceil((data.opensAt - Date.now() - skew) / 1000);
     const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); s = s % 60;
     document.getElementById("countdown").textContent = (h ? h + "h " : "") + String(m).padStart(2, "0") + "m " + String(s).padStart(2, "0") + "s";
   }
-  if (wasOpen === false && open) { say("Sign-up is open. Pick your chapter."); load(); }
+  if (wasOpen === false && open) { if (!activeLock()) say("Sign-up is open. Pick your chapter."); load(); }
   if (wasOpen !== open) render();
   wasOpen = open;
 }
