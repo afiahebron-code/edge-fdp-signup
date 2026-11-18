@@ -19,6 +19,12 @@
     <input type="text" id="name" autocomplete="name" placeholder="e.g. Ada Okafor" maxlength="60">
   </label>
 
+  <div id="wait" class="card" hidden>
+    <div class="tag">Sign-up opens</div>
+    <div class="big" id="opens"></div>
+    <div class="countdown" id="countdown"></div>
+    <p class="lede" style="margin:0">You can type your name now. The chapters unlock automatically when the countdown hits zero — no need to refresh.</p>
+  </div>
   <div id="status" class="status" hidden></div>
   <div id="list" class="list" role="radiogroup" aria-label="FDP chapters"><div class="row"><span></span><span class="tag">Loading chapters…</span><span></span></div></div>
 
@@ -31,7 +37,8 @@
 <script>
 const $ = id => document.getElementById(id);
 const nameEl = $("name"), listEl = $("list"), statusEl = $("status"), saveEl = $("save"), footEl = $("foot");
-let data = null, picked = null, busy = false;
+let data = null, picked = null, busy = false, skew = 0;
+const isOpen = () => !data || Date.now() + skew >= (data.opensAt || 0);
 
 try { nameEl.value = localStorage.getItem("fdp-name") || ""; } catch (e) {}
 
@@ -47,7 +54,7 @@ function render() {
     const row = document.createElement("label");
     row.className = "row" + (full ? " full" : "") + (isMine ? " mine" : "");
     const r = document.createElement("input");
-    r.type = "radio"; r.name = "chapter"; r.id = "ch" + c.id; r.disabled = full; r.checked = picked === c.id;
+    r.type = "radio"; r.name = "chapter"; r.id = "ch" + c.id; r.disabled = full || !isOpen(); r.checked = picked === c.id;
     r.addEventListener("change", () => { picked = c.id; updateSave(); });
     const t = document.createElement("span"); t.className = "title";
     const n = document.createElement("span"); n.className = "num"; n.textContent = (c.id + 1) + ".";
@@ -63,15 +70,16 @@ function render() {
 }
 
 function updateSave() {
-  saveEl.disabled = busy || picked === null || !nameEl.value.trim();
+  saveEl.disabled = busy || picked === null || !nameEl.value.trim() || !isOpen();
   saveEl.textContent = data && data.mine !== null ? "Change my chapter" : "Sign me up";
 }
 
 async function load() {
   try {
     const name = nameEl.value.trim();
-    const res = await fetch(FDP_API + "/api/chapters" + (name ? "?name=" + encodeURIComponent(name) : ""), { cache: "no-store" });
+    const res = await fetch(apiUrl("/api/chapters" + (name ? "?name=" + encodeURIComponent(name) : "")), { cache: "no-store" });
     data = await res.json();
+    skew = data.now - Date.now();
     if (picked === null && data.mine !== null) picked = data.mine;
     if (data.mine !== null && !statusEl.textContent) say(`You already picked chapter ${data.mine + 1}. You can change it below.`);
     render();
@@ -92,14 +100,14 @@ saveEl.addEventListener("click", async () => {
   if (!name || picked === null) return;
   busy = true; updateSave(); say("Saving…");
   try {
-    const res = await fetch(FDP_API + "/api/signup", {
+    const res = await fetch(apiUrl("/api/signup"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, chapter: picked })
     });
     const out = await res.json();
     if (out.ok) {
       try { localStorage.setItem("fdp-name", out.name); } catch (e) {}
-      location.href = "success.html?ch=" + out.chapter + "&t=" + encodeURIComponent(out.title) + "&n=" + encodeURIComponent(out.name);
+      location.href = "success.html?" + (FDP_TEST ? "test&" : "") + "ch=" + out.chapter + "&t=" + encodeURIComponent(out.title) + "&n=" + encodeURIComponent(out.name) + "&at=" + out.at;
       return;
     }
     say(out.error || "Couldn't save. Try again.", true);
@@ -108,7 +116,24 @@ saveEl.addEventListener("click", async () => {
   busy = false; updateSave();
 });
 
+let wasOpen = null;
+function tick() {
+  if (!data) return;
+  const open = isOpen();
+  const w = document.getElementById("wait");
+  w.hidden = open;
+  if (!open) {
+    document.getElementById("opens").textContent = lagosShort(data.opensAt);
+    let s = Math.ceil((data.opensAt - Date.now() - skew) / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); s = s % 60;
+    document.getElementById("countdown").textContent = (h ? h + "h " : "") + String(m).padStart(2, "0") + "m " + String(s).padStart(2, "0") + "s";
+  }
+  if (wasOpen === false && open) { say("Sign-up is open. Pick your chapter."); load(); }
+  if (wasOpen !== open) render();
+  wasOpen = open;
+}
 load();
+setInterval(tick, 250);
 setInterval(() => { if (!busy) load(); }, 15000);
 </script>
 </body>

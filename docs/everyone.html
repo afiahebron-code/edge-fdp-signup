@@ -13,10 +13,11 @@
     <div class="eyebrow">Edge Field Development Plan</div>
     <h1>Who picked what</h1>
     <p class="lede" id="sum">Loading…</p>
+    <p class="foot" style="margin:6px 0 0">Times are when each person last saved their pick, recorded by the server to 1/100 of a second.</p>
   </header>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Chapter</th><th>People</th></tr></thead>
+      <thead><tr><th>Chapter</th><th>People and the time they picked (Lagos time)</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
@@ -26,17 +27,23 @@
 <script>
 async function load() {
   try {
-    const d = await (await fetch(FDP_API + "/api/roster", { cache: "no-store" })).json();
+    const d = await (await fetch(apiUrl("/api/roster"), { cache: "no-store" })).json();
     const rows = document.getElementById("rows"); rows.textContent = "";
     d.chapters.forEach((title, i) => {
-      const people = d.signups.filter(s => s.chapter === i).map(s => s.name);
+      const people = d.signups.filter(s => s.chapter === i).sort((a, b) => a.created_at - b.created_at);
       const tr = document.createElement("tr");
       const a = document.createElement("td"); a.className = "title";
       const n = document.createElement("span"); n.className = "num"; n.textContent = (i + 1) + ".";
       a.append(n, document.createTextNode(title));
       const b = document.createElement("td");
       b.className = people.length ? "names" : "empty";
-      b.textContent = people.length ? people.join(", ") : "No one yet";
+      if (!people.length) b.textContent = "No one yet";
+      people.forEach(p => {
+        const line = document.createElement("div"); line.className = "person";
+        const nm = document.createElement("span"); nm.textContent = p.name;
+        const tm = document.createElement("span"); tm.className = "tag"; tm.textContent = lagosTime(p.created_at, true);
+        line.append(nm, tm); b.append(line);
+      });
       if (people.length >= d.cap) { const tg = document.createElement("div"); tg.className = "tag"; tg.textContent = "Full"; b.append(tg); }
       tr.append(a, b); rows.append(tr);
     });

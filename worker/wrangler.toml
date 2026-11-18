@@ -1,6 +1,11 @@
 name = "edge-fdp-signup"
 main = "index.js"
 compatibility_date = "2025-01-01"
+workers_dev = true
+
+# The website in ../docs is served from the same address as the API.
+[assets]
+directory = "../docs"
 
 [[d1_databases]]
 binding = "DB"

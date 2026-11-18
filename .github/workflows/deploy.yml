@@ -1,0 +1,36 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install wrangler
+        run: npm install -g wrangler@3.99.0
+      - name: Create database (first run only) and apply tables
+        working-directory: worker
+        run: |
+          find_id() { wrangler d1 list --json | jq -r '.[] | select(.name=="edge-fdp-signup") | .uuid'; }
+          ID=$(find_id)
+          if [ -z "$ID" ]; then wrangler d1 create edge-fdp-signup; ID=$(find_id); fi
+          echo "Database id: $ID"
+          sed -i "s/database_id = \"REPLACE\"/database_id = \"$ID\"/" wrangler.toml
+          wrangler d1 execute edge-fdp-signup --remote --file schema.sql
+      - name: Deploy worker and pages
+        working-directory: worker
+        run: wrangler deploy
+      - name: Set admin password
+        working-directory: worker
+        run: echo "$ADMIN_KEY" | wrangler secret put ADMIN_KEY

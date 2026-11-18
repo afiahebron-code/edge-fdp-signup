@@ -6,3 +6,14 @@ CREATE TABLE IF NOT EXISTS signups (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS signups_chapter ON signups(chapter);
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS test_signups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  name_key TEXT NOT NULL UNIQUE,
+  chapter INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
