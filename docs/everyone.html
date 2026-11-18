@@ -48,10 +48,10 @@ async function load() {
         const tm = document.createElement("span"); tm.className = "tag"; tm.textContent = lagosTime(p.created_at, true);
         line.append(nm, tm); b.append(line);
       });
-      if (people.length >= d.cap) { const tg = document.createElement("div"); tg.className = "tag"; tg.textContent = "Full"; b.append(tg); }
+      if (people.length >= (d.caps ? d.caps[i] : d.cap)) { const tg = document.createElement("div"); tg.className = "tag"; tg.textContent = "Full"; b.append(tg); }
       tr.append(a, b); rows.append(tr);
     });
-    document.getElementById("sum").textContent = `${d.signups.length} people signed up. ${d.chapters.length * d.cap - d.signups.length} seats left.`;
+    document.getElementById("sum").textContent = `${d.signups.length} people signed up. ${(d.caps ? d.caps.reduce((a, b) => a + b, 0) : d.chapters.length * d.cap) - d.signups.length} seats left.`;
   } catch (e) { document.getElementById("sum").textContent = "Couldn't load the list. Refresh to try again."; }
 }
 load(); setInterval(load, 20000);

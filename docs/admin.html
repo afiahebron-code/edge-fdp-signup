@@ -46,6 +46,17 @@
       </table>
     </div>
     <div class="card">
+      <h2>Add a person yourself</h2>
+      <p class="lede" style="margin:0">Puts someone straight onto the list shown above, even before sign-up opens. People you add here are kept when you reset the list.</p>
+      <label class="field" for="addname">Name
+        <input type="text" id="addname" maxlength="60">
+      </label>
+      <label class="field" for="addch">Chapter
+        <select id="addch" class="select"></select>
+      </label>
+      <div class="actions"><button id="addbtn" class="btn" type="button">Add to list</button></div>
+    </div>
+    <div class="card">
       <h2 id="opentitle">Opening time for the class link</h2>
       <p class="lede" style="margin:0" id="opennow">Loading…</p>
       <label class="field" for="openat">Open sign-up at (Lagos time)
@@ -58,7 +69,7 @@
     </div>
     <div class="card">
       <h2 id="resettitle">Reset the class list</h2>
-      <p class="lede" style="margin:0">Deletes every sign-up on the list shown above. This can't be undone.</p>
+      <p class="lede" style="margin:0">Deletes every sign-up on the list shown above, except people you added yourself. This can't be undone.</p>
       <div class="actions">
         <button id="reset" class="btn danger" type="button">Delete all sign-ups</button>
         <button id="confirm" class="btn danger" type="button" hidden>Yes, delete all</button>
@@ -96,13 +107,14 @@ async function load() {
     const people = d.signups.filter(s => s.chapter === i);
     if (!people.length) { b.className = "empty"; b.textContent = "No one yet"; }
     people.forEach(p => {
-      const line = document.createElement("div"); line.textContent = p.name + "  ·  " + lagosTime(p.created_at, true);
+      const line = document.createElement("div"); line.textContent = p.name + "  ·  " + lagosTime(p.created_at, true) + (p.reserved ? "  ·  added by you" : "");
       const x = document.createElement("button"); x.className = "link"; x.type = "button"; x.textContent = "remove";
       x.addEventListener("click", async () => { await post("/api/admin/remove", { id: p.id }); say(`Removed ${p.name}.`); load(); });
       line.append(x); b.append(line);
     });
     tr.append(a, b); rows.append(tr);
   });
+  if (!$("addch").options.length) d.chapters.forEach((t, i) => $("addch").add(new Option(`${i + 1}. ${t}`, i)));
   const o = d.opensAt || 0;
   $("opennow").textContent = o > d.now ? "Sign-up is locked until " + lagosShort(o) + "."
     : o ? "Sign-up is open (opened " + lagosShort(o) + ")." : "Sign-up is open now (no opening time set).";
@@ -131,6 +143,11 @@ $("confirm").addEventListener("click", async () => {
   const out = await post("/api/admin/reset", {});
   $("cancel").click();
   if (out.ok) { say("All sign-ups deleted. The sheet is empty again."); load(); } else say(out.error || "Couldn't reset.", true);
+});
+
+$("addbtn").addEventListener("click", async () => {
+  const out = await post("/api/admin/add", { name: $("addname").value, chapter: Number($("addch").value) });
+  if (out.ok) { say(`Added ${$("addname").value.trim()}.`); $("addname").value = ""; load(); } else say(out.error || "Couldn't add.", true);
 });
 
 function setMode(m) {

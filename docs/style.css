@@ -56,3 +56,4 @@ button.link{font:inherit;font-size:13px;border:0;background:none;color:var(--war
 .cover .lede{max-width:44ch}
 .stack{display:flex;flex-direction:column;gap:20px}
 input[readonly]{background:var(--full);color:var(--muted)}
+.select{font:inherit;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}

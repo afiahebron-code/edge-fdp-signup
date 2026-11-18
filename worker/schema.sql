@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS signups (
   name TEXT NOT NULL,
   name_key TEXT NOT NULL UNIQUE,
   chapter INTEGER NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  reserved INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS signups_chapter ON signups(chapter);
 CREATE TABLE IF NOT EXISTS settings (
@@ -15,5 +16,6 @@ CREATE TABLE IF NOT EXISTS test_signups (
   name TEXT NOT NULL,
   name_key TEXT NOT NULL UNIQUE,
   chapter INTEGER NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  reserved INTEGER NOT NULL DEFAULT 0
 );

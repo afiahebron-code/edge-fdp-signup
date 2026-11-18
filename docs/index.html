@@ -92,7 +92,7 @@ function render() {
     const n = document.createElement("span"); n.className = "num"; n.textContent = (c.id + 1) + ".";
     t.append(n, document.createTextNode(c.title));
     const s = document.createElement("span"); s.className = "seats";
-    s.textContent = isMine ? "Your pick" : full ? "Full" : `${c.left} of ${data.cap} left`;
+    s.textContent = isMine ? "Your pick" : full ? "Full" : `${c.left} of ${c.cap} left`;
     row.append(r, t, s);
     listEl.append(row);
   });

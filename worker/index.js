@@ -1,5 +1,7 @@
 // Edge FDP chapter sign-up API (Cloudflare Worker + D1)
-const CAP = 2;
+// Seats per chapter (same order as CHAPTERS). Project Economics takes 1 person.
+const CAPS = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1];
+const CAP = 2; // usual seats per chapter
 const CHAPTERS = [
   "Executive Summary",
   "Asset Description",
@@ -67,21 +69,22 @@ export default {
         }
         return json({
           cap: CAP,
+          caps: CAPS,
           mine,
           opensAt: await getOpensAt(db, isTest),
           round: await getRound(db, isTest),
           test: isTest,
           now: Date.now(),
-          chapters: CHAPTERS.map((title, id) => ({ id, title, taken: c[id], left: Math.max(0, CAP - c[id]) })),
+          chapters: CHAPTERS.map((title, id) => ({ id, title, cap: CAPS[id], taken: c[id], left: Math.max(0, CAPS[id] - c[id]) })),
         });
       }
 
       // Everyone and their chapter — used by the "who picked what" page.
       if (url.pathname === "/api/roster" && req.method === "GET") {
         const { results } = await db
-          .prepare(`SELECT id, name, chapter, created_at FROM ${T} ORDER BY chapter, created_at`)
+          .prepare(`SELECT id, name, chapter, created_at, reserved FROM ${T} ORDER BY chapter, created_at`)
           .all();
-        return json({ cap: CAP, chapters: CHAPTERS, signups: results, opensAt: await getOpensAt(db, isTest), test: isTest, now: Date.now() });
+        return json({ cap: CAP, caps: CAPS, chapters: CHAPTERS, signups: results, opensAt: await getOpensAt(db, isTest), test: isTest, now: Date.now() });
       }
 
       if (url.pathname === "/api/signup" && req.method === "POST") {
@@ -106,7 +109,7 @@ export default {
                SELECT ?1, ?2, ?3, ?4
                WHERE (SELECT COUNT(*) FROM ${T} WHERE chapter = ?3) < ?5`
             )
-            .bind(name, key, ch, Date.now(), CAP)
+            .bind(name, key, ch, Date.now(), CAPS[ch])
             .run();
         } catch (e) {
           if (String(e).includes("UNIQUE")) return json({ error: `${name} has already signed up.`, already: true }, 409);
@@ -126,6 +129,23 @@ export default {
           await db.prepare(`DELETE FROM ${T} WHERE id = ?1`).bind(Number(body.id)).run();
           return json({ ok: true });
         }
+        // Add someone yourself (any time, even before opening). Kept when the list is reset.
+        if (url.pathname === "/api/admin/add") {
+          const name = cleanName(body.name);
+          const ch = Number(body.chapter);
+          if (!name) return json({ error: "Type a name." }, 400);
+          if (!Number.isInteger(ch) || ch < 0 || ch >= CHAPTERS.length) return json({ error: "Pick a chapter." }, 400);
+          try {
+            await db
+              .prepare(`INSERT INTO ${T} (name, name_key, chapter, created_at, reserved) VALUES (?1, ?2, ?3, ?4, 1)`)
+              .bind(name, nameKey(name), ch, Date.now())
+              .run();
+          } catch (e) {
+            if (String(e).includes("UNIQUE")) return json({ error: `${name} is already on the list.` }, 409);
+            throw e;
+          }
+          return json({ ok: true });
+        }
         if (url.pathname === "/api/admin/open") {
           const t = Number(body.opensAt) || 0;
           await db.prepare("INSERT INTO settings (key, value) VALUES (?2, ?1) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(String(t), isTest ? "test_opens_at" : "opens_at").run();
@@ -133,7 +153,7 @@ export default {
         }
         if (url.pathname === "/api/admin/reset") {
           await db.batch([
-            db.prepare(`DELETE FROM ${T}`),
+            db.prepare(`DELETE FROM ${T} WHERE reserved = 0`),
             db.prepare("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
               .bind(isTest ? "test_round" : "round", String(Date.now())),
           ]);
