@@ -31,6 +31,19 @@ jobs:
           echo "Database id: $ID"
           sed -i "s/database_id = \"REPLACE\"/database_id = \"$ID\"/" wrangler.toml
           wrangler d1 execute edge-fdp-signup --remote --file schema.sql
+      - name: Make sure the account has a workers.dev address
+        run: |
+          ACC=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | jq -r '.result[0].id')
+          CUR=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$ACC/workers/subdomain" | jq -r '.result.subdomain // empty')
+          if [ -z "$CUR" ]; then
+            for NAME in edgefdp edge-fdp-class edgefdp-$(date +%s | tail -c 5); do
+              R=$(curl -s -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
+                --data "{\"subdomain\":\"$NAME\"}" "https://api.cloudflare.com/client/v4/accounts/$ACC/workers/subdomain")
+              echo "$R" | jq -c '{success, errors}'
+              if [ "$(echo "$R" | jq -r .success)" = "true" ]; then CUR=$NAME; break; fi
+            done
+          fi
+          echo "workers.dev subdomain: $CUR"
       - name: Deploy worker and pages
         working-directory: worker
         run: wrangler deploy
