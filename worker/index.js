@@ -96,7 +96,7 @@ export default {
         const key = nameKey(name);
         const existing = await db.prepare(`SELECT chapter FROM ${T} WHERE name_key = ?1`).bind(key).first();
         if (existing)
-          return json({ error: `${name} has already signed up for chapter ${existing.chapter + 1} (${CHAPTERS[existing.chapter]}). Ask the class rep if it needs changing.`, already: true }, 409);
+          return json({ error: `${name} has already signed up for chapter ${existing.chapter + 1} (${CHAPTERS[existing.chapter]}).`, already: true }, 409);
         // Atomic: only writes when the chapter still has room.
         let res;
         try {
